@@ -1,5 +1,7 @@
 const express = require("express");
 const cors = require("cors");
+const bcrypt = require('bcrypt');
+const jwt = require('jsonwebtoken');
 
 const { MongoClient, ServerApiVersion, ObjectId } = require("mongodb");
 require("dotenv").config();
@@ -25,6 +27,8 @@ async function run(){
       // collection 2
       const usersCollection = client.db('workoutPlansWebApplication').collection('workout-plans-users');
     
+
+      //------------------ Oprational section start -------------------------------/
       // Define a route for creating workout plans
       app.post('/workout-plans', async (req, res) => {
           // Insert the workout plan into the "workout-plans" collection
@@ -52,33 +56,60 @@ async function run(){
           res.send(result);
       });
 
-
-      // API for user registration
-      app.put("/register", async (req, res) => {
-        const user = req.body;
-        const email = user.email;
-        const filter = { email: email };
-        const options = { upsert: true };   // chacking before inserting 
-        const updateDoc = {
-          $set: user,
-        };
-        const result = await usersCollection.updateOne(
-          filter,
-          updateDoc,
-          options
-        );
-        res.send(result);
-      });
-
-      
-
-
       // get APO for workout-plans
       app.get("/workout-plans", async (req, res) => {
         const query = {};
         const data = await workoutPlansCollection.find(query).toArray();
         res.send(data);
       });
+
+
+      //------------------ Oprational section END -------------------------------/
+
+
+
+
+      // --------------------- Authentication section  start ----------------------//
+      // User registration endpoint
+      app.post("/register", async (req, res) => {
+        const { email, password } = req.body;
+        // Check if user already exists
+        const user = await usersCollection.findOne({ email });
+        if (user) {
+          return res.status(409).json({ message: 'Email already in use' });
+        }
+        // Hash the password
+        const hashedPassword = await bcrypt.hash(password, 10);
+        // Insert the new user into the database
+        const result = await usersCollection.insertOne({ email, password: hashedPassword });
+
+        // Generate a JWT token for the new user
+        const token = jwt.sign({ id: result.insertedId }, `${process.env.secret_keyRegister}`);
+
+        res.status(201).json({ message: 'User created', token });
+      });
+
+      // User login endpoint
+      app.post("/login", async (req, res) => {
+        const { email, password } = req.body;
+        // Check if user exists
+        const user = await usersCollection.findOne({ email });
+        if (!user) {
+          return res.status(401).json({ message: 'Invalid email or password' });
+        }
+        // Check if password is correct
+        const passwordMatch = await bcrypt.compare(password, user.password);
+        if (!passwordMatch) {
+          return res.status(401).json({ message: 'Invalid email or password' });
+        }
+        // Generate a JWT token for the user
+        const token = jwt.sign({ id: user._id }, `${process.env.secret_keyLogin}`);
+
+        res.status(200).json({ message: 'Login successful', token });        
+      });
+
+      // --------------------- Authentication section  END ----------------------//
+
   }
   finally{
 
