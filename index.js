@@ -22,6 +22,8 @@ async function run(){
 
       // collection 1
       const workoutPlansCollection = client.db('workoutPlansWebApplication').collection('workout-plans');
+      // collection 2
+      const usersCollection = client.db('workoutPlansWebApplication').collection('workout-plans-users');
     
       // Define a route for creating workout plans
       app.post('/workout-plans', async (req, res) => {
@@ -50,9 +52,36 @@ async function run(){
           res.send(result);
       });
 
+
+      // API for user registration
+      app.put("/register", async (req, res) => {
+        const user = req.body;
+        const email = user.email;
+        const filter = { email: email };
+        const options = { upsert: true };   // chacking before inserting 
+        const updateDoc = {
+          $set: user,
+        };
+        const result = await usersCollection.updateOne(
+          filter,
+          updateDoc,
+          options
+        );
+        res.send(result);
+      });
+
+      
+
+
+      // get APO for workout-plans
+      app.get("/workout-plans", async (req, res) => {
+        const query = {};
+        const data = await workoutPlansCollection.find(query).toArray();
+        res.send(data);
+      });
   }
   finally{
-       
+
   }
 }
 run().catch(err => console.error(err));
